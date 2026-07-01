@@ -20,49 +20,75 @@ CORS(app)  # Allows your website to talk to this backend
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 # ============================================================
-# 2. OPENAI (Smart AI)
+# VIDYA-9B - NCERT Expert (Classes 6-12)
 # ============================================================
-def generate_with_openai(prompt):
-    if not OPENAI_API_KEY:
-        return None
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    data = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 2000,
-        "temperature": 0.8,
-    }
-    try:
-        resp = requests.post(url, headers=headers, json=data, timeout=60)
-        if resp.status_code == 200:
-            return resp.json()['choices'][0]['message']['content']
-        print(f"OpenAI Error: {resp.status_code}")
-        return None
-    except Exception as e:
-        print(f"OpenAI Exception: {e}")
-        return None
 
-# ============================================================
-# 3. HUGGINGFACE (Free Backup)
-# ============================================================
-def generate_with_huggingface(prompt):
-    url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
-    payload = {
-        "inputs": prompt,
-        "parameters": {"max_new_tokens": 1500, "temperature": 0.7, "return_full_text": False},
-    }
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+# Load Vidya-9B (this runs on Render's free tier!)
+def generate_with_vidya(prompt):
     try:
-        resp = requests.post(url, json=payload, timeout=60)
-        if resp.status_code == 200:
-            data = resp.json()
-            if isinstance(data, list) and data:
-                return data[0].get('generated_text', '')
-        return None
-    except Exception:
+        # Load model (only once!)
+        if not hasattr(generate_with_vidya, "model"):
+            print("🔄 Loading Vidya-9B... (this takes ~30 seconds)")
+            model_name = "neo-saket/vidya-9b"
+            
+            # Use CPU if GPU not available (Render free tier)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"📱 Using device: {device}")
+            
+            generate_with_vidya.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            generate_with_vidya.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float32,
+                device_map="auto" if device == "cuda" else None,
+                low_cpu_mem_usage=True
+            )
+            
+            if device == "cpu":
+                generate_with_vidya.model.to("cpu")
+            
+            print("✅ Vidya-9B loaded successfully!")
+
+        # Build prompt for Vidya (it's trained on NCERT!)
+        full_prompt = f"""
+### Instruction:
+You are a knowledgeable NCERT teacher for Classes 6-12. Create a high-quality worksheet.
+
+### Subject: {subject}
+### Topic: {topic}
+### Grade Level: {grade}
+### Number of Questions: {num_q}
+### Question Type: {q_type}
+### Extra: {extra if extra else "None"}
+
+### Response:
+Here is a worksheet with {num_q} unique questions. Include an answer key at the end.
+"""
+        
+        # Generate
+        inputs = generate_with_vidya.tokenizer(full_prompt, return_tensors="pt")
+        if device == "cuda":
+            inputs = {k: v.to("cuda") for k, v in inputs.items()}
+        
+        outputs = generate_with_vidya.model.generate(
+            **inputs,
+            max_new_tokens=1500,
+            temperature=0.8,
+            do_sample=True,
+            pad_token_id=generate_with_vidya.tokenizer.eos_token_id
+        )
+        
+        response = generate_with_vidya.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        # Extract just the worksheet part
+        if "### Response:" in response:
+            response = response.split("### Response:")[-1].strip()
+        
+        return response
+    except Exception as e:
+        print(f"❌ Vidya error: {e}")
         return None
 
 # ============================================================
@@ -96,28 +122,18 @@ QUESTIONS:
 # 5. THE MAIN GENERATOR
 # ============================================================
 def generate_worksheet(subject, topic, grade, num_q, q_type, extra):
-    prompt = f"""
-You are an expert teacher. Create a unique, diverse worksheet.
-
-RULES:
-- NEVER repeat the same question.
-- For multiple choice, give 4 REAL options (not Option 1,2,3,4).
-
-Subject: {subject}
-Topic: {topic}
-Grade: {grade}
-Number: {num_q}
-Type: {q_type}
-Extra: {extra if extra else "None"}
-
-Create the worksheet with a title, instructions, {num_q} unique questions, and an answer key.
-"""
-    result = generate_with_openai(prompt)
+    # Try Vidya first (NCERT expert!)
+    result = generate_with_vidya(subject, topic, grade, num_q, q_type, extra)
     if result:
         return result
+    
+    # Fallback to HuggingFace if Vidya fails
+    prompt = f"Create a worksheet for {subject} on {topic} for {grade} with {num_q} questions."
     result = generate_with_huggingface(prompt)
     if result:
         return result
+    
+    # Ultimate fallback
     return generate_fallback(subject, topic, grade, num_q, q_type)
 
 # ============================================================
