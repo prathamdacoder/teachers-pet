@@ -1,100 +1,124 @@
 # ============================================================
-# TEACHER'S PET - COMPLETE BACKEND (The Brain)
+# TEACHER'S PET - SIMPLE & WORKING!
 # ============================================================
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
 import os
+import requests
 from dotenv import load_dotenv
 
-# Load the API key from the .env file
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Allows your website to talk to this backend
+CORS(app)
 
 # ============================================================
-# 1. GET YOUR SECRET API KEY
+# GET API KEYS
 # ============================================================
+
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 # ============================================================
-# VIDYA-9B - NCERT Expert (Classes 6-12)
+# GENERATE WITH GROQ (FAST & FREE!)
 # ============================================================
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-
-# Load Vidya-9B (this runs on Render's free tier!)
-def generate_with_vidya(subject, topic, grade, num_q, q_type, extra):
+def generate_with_groq(subject, topic, grade, num_q, q_type, extra):
+    if not GROQ_API_KEY:
+        print("❌ No Groq API key found")
+        return None
+    
     try:
-        # Load model (only once!)
-        if not hasattr(generate_with_vidya, "model"):
-            print("🔄 Loading Vidya-9B... (this takes ~30 seconds)")
-            model_name = "neo-saket/vidya-9b"
-            
-            # Use CPU if GPU not available (Render free tier)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            print(f"📱 Using device: {device}")
-            
-            generate_with_vidya.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            generate_with_vidya.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype=torch.float32,
-                device_map="auto" if device == "cuda" else None,
-                low_cpu_mem_usage=True
-            )
-            
-            if device == "cpu":
-                generate_with_vidya.model.to("cpu")
-            
-            print("✅ Vidya-9B loaded successfully!")
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        prompt = f"""You are a teacher creating a worksheet for {grade} students.
 
-        # Build prompt for Vidya (it's trained on NCERT!)
-        full_prompt = f"""
-### Instruction:
-You are a knowledgeable NCERT teacher for Classes 6-12. Create a high-quality worksheet.
+Subject: {subject}
+Topic: {topic}
+Number of Questions: {num_q}
+Question Type: {q_type}
+Extra Instructions: {extra if extra else "None"}
 
-### Subject: {subject}
-### Topic: {topic}
-### Grade Level: {grade}
-### Number of Questions: {num_q}
-### Question Type: {q_type}
-### Extra: {extra if extra else "None"}
+Create {num_q} unique questions about {topic} for {subject}.
+Make sure each question is DIFFERENT.
+For multiple choice, give 4 options (A, B, C, D).
+Include an answer key at the end.
 
-### Response:
-Here is a worksheet with {num_q} unique questions. Include an answer key at the end.
+Worksheet:
 """
         
-        # Generate
-        inputs = generate_with_vidya.tokenizer(full_prompt, return_tensors="pt")
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        if device == "cuda":
-            inputs = {k: v.to("cuda") for k, v in inputs.items()}
+        data = {
+            "model": "mixtral-8x7b-32768",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 1500
+        }
         
-        outputs = generate_with_vidya.model.generate(
-            **inputs,
-            max_new_tokens=1500,
-            temperature=0.8,
-            do_sample=True,
-            pad_token_id=generate_with_vidya.tokenizer.eos_token_id
-        )
+        response = requests.post(url, headers=headers, json=data, timeout=30)
         
-        response = generate_with_vidya.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # Extract just the worksheet part
-        if "### Response:" in response:
-            response = response.split("### Response:")[-1].strip()
-        
-        return response
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        else:
+            print(f"Groq API Error: {response.status_code}")
+            return None
+            
     except Exception as e:
-        print(f"❌ Vidya error: {e}")
+        print(f"Groq Exception: {e}")
         return None
 
 # ============================================================
-# 4. FALLBACK (No AI - Always works)
+# GENERATE WITH OPENAI (BACKUP)
 # ============================================================
+
+def generate_with_openai(subject, topic, grade, num_q, q_type, extra):
+    if not OPENAI_API_KEY:
+        return None
+    
+    try:
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        prompt = f"""Create a worksheet for {grade} students.
+Subject: {subject}
+Topic: {topic}
+Questions: {num_q} ({q_type})
+Extra: {extra if extra else "None"}
+
+Create {num_q} unique questions with an answer key.
+"""
+        
+        data = {
+            "model": "gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 1500
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        else:
+            return None
+            
+    except Exception as e:
+        print(f"OpenAI Exception: {e}")
+        return None
+
+# ============================================================
+# FALLBACK (ALWAYS WORKS!)
+# ============================================================
+
 def generate_fallback(subject, topic, grade, num_q, q_type):
     num_q = int(num_q)
     worksheet = f"""
@@ -111,8 +135,12 @@ QUESTIONS:
     for i in range(1, num_q + 1):
         if q_type == "Multiple Choice":
             worksheet += f"\n{i}. What is {topic}?\n   A) Option 1\n   B) Option 2\n   C) Option 3\n   D) Option 4\n"
+        elif q_type == "True/False":
+            worksheet += f"\n{i}. {topic} is important. (True/False)\n"
+        elif q_type == "Fill in the Blank":
+            worksheet += f"\n{i}. The study of {topic} is called ______.\n"
         else:
-            worksheet += f"\n{i}. Explain the concept of {topic}.\n"
+            worksheet += f"\n{i}. Explain {topic} in your own words.\n"
 
     worksheet += "\n========================================\nANSWER KEY\n========================================\n"
     for i in range(1, num_q + 1):
@@ -120,56 +148,66 @@ QUESTIONS:
     return worksheet
 
 # ============================================================
-# 5. THE MAIN GENERATOR
+# MAIN GENERATOR
 # ============================================================
+
 def generate_worksheet(subject, topic, grade, num_q, q_type, extra):
-    # Try Vidya first (NCERT expert!)
-    result = generate_with_vidya(subject, topic, grade, num_q, q_type, extra)
+    print(f"📝 Generating: {subject} - {topic}")
+    
+    # Try Groq first
+    result = generate_with_groq(subject, topic, grade, num_q, q_type, extra)
     if result:
         return result
     
-    # Fallback to HuggingFace if Vidya fails
-    prompt = f"Create a worksheet for {subject} on {topic} for {grade} with {num_q} questions."
-    result = generate_with_huggingface(prompt)
+    # Try OpenAI as backup
+    print("⚠️ Groq failed, trying OpenAI...")
+    result = generate_with_openai(subject, topic, grade, num_q, q_type, extra)
     if result:
         return result
     
     # Ultimate fallback
+    print("⚠️ All AI failed, using fallback...")
     return generate_fallback(subject, topic, grade, num_q, q_type)
 
 # ============================================================
-# 6. THE ROUTES (Connecting the website)
+# ROUTES
 # ============================================================
+
 @app.route('/generate', methods=['POST'])
 def generate():
     try:
         data = request.get_json()
-        worksheet = generate_worksheet(
-            data.get('subject', 'Math'),
-            data.get('topic', 'Fractions'),
-            data.get('grade', '5th Grade'),
-            data.get('numQuestions', 10),
-            data.get('questionType', 'Multiple Choice'),
-            data.get('extraInstructions', '')
-        )
+        subject = data.get('subject', 'Math')
+        topic = data.get('topic', 'Fractions')
+        grade = data.get('grade', '5th Grade')
+        num_q = data.get('numQuestions', 10)
+        q_type = data.get('questionType', 'Multiple Choice')
+        extra = data.get('extraInstructions', '')
+        
+        worksheet = generate_worksheet(subject, topic, grade, num_q, q_type, extra)
         return jsonify({'worksheet': worksheet, 'success': True})
+        
     except Exception as e:
+        print(f"❌ Error: {e}")
         return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/test', methods=['GET'])
 def test():
-    return jsonify({'message': '🚀 Backend is running!'})
+    return jsonify({'message': '🚀 Teacher\'s Pet is running!'})
 
 # ============================================================
-# 7. START THE SERVER
+# START
 # ============================================================
+
 if __name__ == '__main__':
     print("=" * 50)
     print("🚀 TEACHER'S PET BACKEND STARTED!")
     print("📍 http://localhost:5000")
+    if GROQ_API_KEY:
+        print("✅ GROQ API Key: FOUND")
     if OPENAI_API_KEY:
-        print("✅ OpenAI API Key: FOUND (Smart worksheets enabled!)")
-    else:
-        print("⚠️ No OpenAI API Key found. Using fallback.")
+        print("✅ OPENAI API Key: FOUND")
+    if not GROQ_API_KEY and not OPENAI_API_KEY:
+        print("⚠️ No API keys found. Using fallback only.")
     print("=" * 50)
     app.run(debug=True, host='0.0.0.0', port=5000)
