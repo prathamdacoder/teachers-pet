@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teacher's Pet - Worksheet Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 30px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #777;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .emoji-big {
+            font-size: 50px;
+            text-align: center;
+            display: block;
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-top: 18px;
+            margin-bottom: 5px;
+            color: #444;
+        }
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: 0.3s;
+            background: #f9f9f9;
+        }
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #667eea;
+            outline: none;
+            background: white;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .row>div {
+            flex: 1;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+        }
+        .download-btn {
+            background: #27ae60;
+            box-shadow: 0 5px 20px rgba(39, 174, 96, 0.4);
+        }
+        .download-btn:hover {
+            background: #2ecc71;
+        }
+        .share-btn {
+            background: #e67e22;
+            box-shadow: 0 5px 20px rgba(230, 126, 34, 0.4);
+        }
+        .share-btn:hover {
+            background: #d35400;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 18px;
+            color: #667eea;
+            font-weight: 600;
+        }
+        #result {
+            display: none;
+            margin-top: 25px;
+            background: #f0f4ff;
+            border-radius: 16px;
+            padding: 25px;
+            border-left: 5px solid #667eea;
+        }
+        #worksheetContent {
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.8;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+        }
+        #solveSection {
+            display: none;
+            margin-top: 20px;
+            border-top: 2px dashed #667eea;
+            padding-top: 20px;
+        }
+        .question-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+        .question-box label {
+            display: block;
+            margin: 5px 0;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        .question-box label:hover {
+            background: #f0f4ff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 25px;
+            color: #aaa;
+            font-size: 12px;
+        }
+        #shareModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+        }
+        #shareModal>div {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+        }
+        #shareModal input {
+            width: 100%;
+            border: none;
+            background: #f0f4ff;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .student-mode #worksheetForm {
+            display: none !important;
+        }
+        .student-mode .share-btn,
+        .student-mode .download-btn {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="mainContainer">
+        <span class="emoji-big">📚</span>
+        <h1>Teacher's Pet</h1>
+        <p class="subtitle">⚡ Generate custom worksheets in 5 seconds ⚡</p>
+
+        <form id="worksheetForm">
+            <label for="subject">📖 Subject</label>
+            <input type="text" id="subject" placeholder="e.g. Math, Science" required />
+
+            <label for="topic">🎯 Topic</label>
+            <input type="text" id="topic" placeholder="e.g. Fractions, Algebra" required />
+
+            <label for="grade">📊 Grade Level</label>
+            <select id="grade">
+                <option value="5th Grade">5th Grade</option>
+                <option value="6th Grade">6th Grade</option>
+                <option value="7th Grade" selected>7th Grade</option>
+                <option value="8th Grade">8th Grade</option>
+                <option value="High School">High School</option>
+            </select>
+
+            <div class="row">
+                <div>
+                    <label for="numQuestions">🔢 Questions</label>
+                    <input type="number" id="numQuestions" value="10" min="5" max="30" />
+                </div>
+                <div>
+                    <label for="questionType">📝 Type</label>
+                    <select id="questionType">
+                        <option value="Multiple Choice">Multiple Choice</option>
+                        <option value="Fill in the Blank">Fill in the Blank</option>
+                        <option value="Short Answer">Short Answer</option>
+                    </select>
+                </div>
+            </div>
+
+            <label for="extraInstructions">✏️ Extra Instructions</label>
+            <textarea id="extraInstructions" placeholder="e.g. Make it fun, include word bank..."></textarea>
+
+            <button type="submit">🚀 Generate Worksheet</button>
+        </form>
+
+        <div id="loading">⏳ Generating...</div>
+
+        <div id="result">
+            <h3>📄 Your Worksheet is Ready!</h3>
+            <div id="worksheetContent"></div>
+            <button class="download-btn" id="downloadBtn">⬇️ Download</button>
+            <button class="share-btn" id="shareWorksheetBtn">📤 Share with Students</button>
+
+            <div id="solveSection">
+                <h3>📝 Solve Online!</h3>
+                <div id="questionsContainer"></div>
+                <button id="submitAnswersBtn">✅ Submit & Grade</button>
+                <div id="resultScore" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <div class="footer">Made with ❤️ by a 12-year-old genius</div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal">
+        <div>
+            <h2>📤 Share This Worksheet</h2>
+            <input type="text" id="shareLinkInput" readonly />
+            <button class="modal-btn" onclick="copyShareLink()" style="background:#3498db;color:white;padding:12px;border:none;border-radius:10px;width:100%;font-weight:bold;cursor:pointer;">📋 Copy Link</button>
+            <button onclick="closeShareModal()" style="background:#e74c3c;color:white;padding:12px;border:none;border-radius:10px;width:100%;font-weight:bold;cursor:pointer;margin-top:5px;">❌ Close</button>
+            <div id="shareStatus" style="margin-top:10px;text-align:center;"></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 1. FORM SUBMISSION
+        // ============================================================
+        const form = document.getElementById('worksheetForm');
+        const loading = document.getElementById('loading');
+        const resultDiv = document.getElementById('result');
+        const worksheetContent = document.getElementById('worksheetContent');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                subject: document.getElementById('subject').value,
+                topic: document.getElementById('topic').value,
+                grade: document.getElementById('grade').value,
+                numQuestions: document.getElementById('numQuestions').value,
+                questionType: document.getElementById('questionType').value,
+                extraInstructions: document.getElementById('extraInstructions').value,
+            };
+
+            loading.style.display = 'block';
+            resultDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('http://localhost:5000/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                const result = await response.json();
+                if (result.error) {
+                    alert('❌ ' + result.error);
+                } else {
+                    worksheetContent.textContent = result.worksheet;
+                    resultDiv.style.display = 'block';
+                    setTimeout(() => displaySolveSection(result.worksheet), 400);
+                }
+            } catch (err) {
+                alert('❌ Backend not running! Make sure python app.py is running.');
+            }
+            loading.style.display = 'none';
+        });
+
+        // ============================================================
+        // 2. DOWNLOAD
+        // ============================================================
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const blob = new Blob([worksheetContent.textContent], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'worksheet.txt';
+            link.click();
+        });
+
+        // ============================================================
+        // 3. SHARE
+        // ============================================================
+        function saveWorksheetForSharing(text) {
+            const id = 'ws_' + Date.now();
+            const all = JSON.parse(localStorage.getItem('sharedWorksheets') || '{}');
+            all[id] = { worksheet: text };
+            localStorage.setItem('sharedWorksheets', JSON.stringify(all));
+            return id;
+        }
+
+        document.getElementById('shareWorksheetBtn').addEventListener('click', () => {
+            const text = worksheetContent.textContent;
+            if (!text.trim()) return alert('Generate a worksheet first!');
+            const id = saveWorksheetForSharing(text);
+            const link = window.location.href.split('?')[0] + '?solve=' + id;
+            document.getElementById('shareLinkInput').value = link;
+            document.getElementById('shareModal').style.display = 'flex';
+        });
+
+        function copyShareLink() {
+            const input = document.getElementById('shareLinkInput');
+            input.select();
+            document.execCommand('copy');
+            document.getElementById('shareStatus').innerHTML = '✅ Copied!';
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').style.display = 'none';
+        }
+
+        // ============================================================
+        // 4. SOLVE SECTION
+        // ============================================================
+        let currentQuestions = [];
+
+        function parseQuestions(text) {
+            const lines = text.split('\n');
+            const qs = [];
+            let current = null;
+            let inAnswerKey = false;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+                if (line.toUpperCase().includes('ANSWER KEY')) { inAnswerKey = true; continue; }
+                if (inAnswerKey) continue;
+
+                const match = line.match(/^(\d+)\.\s*(.+)/);
+                if (match) {
+                    if (current) qs.push(current);
+                    current = { number: parseInt(match[1]), text: match[2], options: [], answer: null };
+                } else if (current && (line.match(/^[A-D]\)/) || line.match(/^[A-D]\./))) {
+                    const opt = line.match(/^([A-D])[\)\.]\s*(.+)/);
+                    if (opt) current.options.push({ letter: opt[1], text: opt[2] });
+                }
+            }
+            if (current) qs.push(current);
+            return qs;
+        }
+
+        function displaySolveSection(text) {
+            const container = document.getElementById('questionsContainer');
+            currentQuestions = parseQuestions(text);
+
+            if (!currentQuestions.length) {
+                container.innerHTML = '<p>No questions found to solve.</p>';
+                document.getElementById('solveSection').style.display = 'block';
+                return;
+            }
+
+            let html = '';
+            currentQuestions.forEach(q => {
+                html += `<div class="question-box"><p><strong>Q${q.number}:</strong> ${q.text}</p>`;
+                if (q.options.length) {
+                    html += `<div>`;
+                    q.options.forEach(opt => {
+                        html += `<label><input type="radio" name="q${q.number}" value="${opt.letter}" /> ${opt.letter}) ${opt.text}</label>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html +=
+                        `<input type="text" id="input_q${q.number}" placeholder="Type answer..." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" />`;
+                }
+                html += `</div>`;
+            });
+            container.innerHTML = html;
+            document.getElementById('solveSection').style.display = 'block';
+        }
+
+        document.getElementById('submitAnswersBtn').addEventListener('click', function() {
+            let correct = 0;
+            let total = currentQuestions.length;
+            let feedback = '';
+
+            currentQuestions.forEach(q => {
+                const radio = document.querySelector(`input[name="q${q.number}"]:checked`);
+                const textInput = document.getElementById(`input_q${q.number}`);
+                let answer = radio ? radio.value : (textInput ? textInput.value.trim().toLowerCase() : '');
+
+                const isCorrect = answer.length > 0;
+                if (isCorrect) correct++;
+                feedback += `<p>Q${q.number}: ${isCorrect ? '✅' : '❌'}</p>`;
+            });
+
+            const score = Math.round((correct / total) * 100);
+            document.getElementById('resultScore').innerHTML = `
+                <div style="text-align:center;padding:20px;background:#f0f4ff;border-radius:12px;">
+                    <div style="font-size:48px;">${score >= 70 ? '🎉' : '📚'}</div>
+                    <div style="font-size:24px;font-weight:bold;">${correct}/${total} (${score}%)</div>
+                    <div style="font-size:14px;">${feedback}</div>
+                </div>
+            `;
+        });
+
+        // ============================================================
+        // 5. STUDENT MODE
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const solveId = params.get('solve');
+            if (solveId) {
+                document.getElementById('mainContainer').classList.add('student-mode');
+                document.querySelector('.subtitle').textContent = '📝 Solve this worksheet!';
+                document.querySelector('.emoji-big').textContent = '✏️';
+                document.querySelector('h1').textContent = 'Student Worksheet';
+
+                const all = JSON.parse(localStorage.getItem('sharedWorksheets') || '{}');
+                const data = all[solveId];
+                if (data) {
+                    worksheetContent.textContent = data.worksheet;
+                    resultDiv.style.display = 'block';
+                    document.getElementById('downloadBtn').style.display = 'none';
+                    document.getElementById('shareWorksheetBtn').style.display = 'none';
+                    document.getElementById('submitAnswersBtn').textContent = '✅ Submit & Get Grade';
+                    setTimeout(() => displaySolveSection(data.worksheet), 500);
+                } else {
+                    alert('❌ Link expired or invalid!');
+                }
+            }
+        });
+
+        console.log('🚀 Teacher\'s Pet loaded!');
+    </script>
+
+</body>
+</html>
