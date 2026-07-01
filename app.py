@@ -27,7 +27,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
 # Load Vidya-9B (this runs on Render's free tier!)
-def generate_with_vidya(prompt):
+def generate_with_vidya(subject, topic, grade, num_q, q_type, extra):
     try:
         # Load model (only once!)
         if not hasattr(generate_with_vidya, "model"):
@@ -69,6 +69,7 @@ Here is a worksheet with {num_q} unique questions. Include an answer key at the 
         
         # Generate
         inputs = generate_with_vidya.tokenizer(full_prompt, return_tensors="pt")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         if device == "cuda":
             inputs = {k: v.to("cuda") for k, v in inputs.items()}
         
